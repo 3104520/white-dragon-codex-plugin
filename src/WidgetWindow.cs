@@ -43,8 +43,6 @@ namespace DragonQuota
         private int _layoutOpacity;
         private DockDrag _drag;
         private DragSurface _dragSurface;
-        private bool _previewBubble;
-        private bool _editingSettings;
         private bool _mouseWasDown;
         private bool _closed;
 
@@ -158,11 +156,13 @@ namespace DragonQuota
             var target = PresentationSource.FromVisual(this);
             double viewDpi = target == null || target.CompositionTarget == null ? dpi : target.CompositionTarget.TransformToDevice.M11;
             if (_layout.Mascot != layout.Mascot || _layout.Bubble != layout.Bubble || _layout.Window != placement ||
+                _layout.BubbleSide != layout.BubbleSide || _layout.CompactBubble != layout.CompactBubble ||
                 _layoutDpi != viewDpi || _layoutOpacity != _settings.Opacity)
             {
                 _view.ArrangeWidget(new Size(placement.Width / viewDpi, placement.Height / viewDpi),
                     WidgetLayout.Relative(layout.Mascot, placement, viewDpi),
-                    WidgetLayout.Relative(layout.Bubble, placement, viewDpi), layout.BubbleBelow, _settings.Opacity);
+                    WidgetLayout.Relative(layout.Bubble, placement, viewDpi),
+                    layout.BubbleSide, layout.CompactBubble, _settings.Opacity);
                 _layoutDpi = viewDpi;
                 _layoutOpacity = _settings.Opacity;
                 _nextPaint = DateTimeOffset.MinValue;
@@ -295,7 +295,6 @@ namespace DragonQuota
 
         private void CycleBubble(bool poke)
         {
-            _previewBubble = false;
             _completion = null;
             _completionSession = null;
             if (poke)
@@ -361,7 +360,6 @@ namespace DragonQuota
 
         private void CloseBubble(bool animate = true)
         {
-            _previewBubble = false;
             _completion = null;
             _completionSession = null;
             _view.ShowBubble(BubbleMode.Closed, animate);
@@ -388,7 +386,6 @@ namespace DragonQuota
             if (_panel == null)
             {
                 _panel = new TelemetryPanel(_settings, _art, ChangeSettings, RefreshNow, LayoutChildren);
-                _panel.IsVisibleChanged += (sender, args) => SyncPreview();
                 _panel.Deactivated += (sender, args) => Dispatcher.BeginInvoke(new Action(() => {
                     if (_panel.IsVisible && !NativeWindows.BelongsTo(NativeWindows.GetForegroundWindow(), _processId)) _panel.Hide();
                 }), DispatcherPriority.Background);
@@ -430,7 +427,6 @@ namespace DragonQuota
             if (_settings.ShowStats) _stats.Follow(_hostBounds, NativeWindows.ScaleOf(_host));
             else if (_stats.IsVisible) _stats.Hide();
             if (_panel != null && _panel.IsVisible) PlacePanel(false);
-            SyncPreview();
         }
 
         private void PlacePanel(bool open)
@@ -464,22 +460,6 @@ namespace DragonQuota
                 _panelPlacement = placement;
             }
             if (open) _panel.Activate();
-        }
-
-        private void SyncPreview()
-        {
-            bool editing = _panel != null && _panel.IsVisible && _panel.Page == PanelPage.Settings;
-            bool opening = editing && !_editingSettings;
-            _editingSettings = editing;
-            if (opening && _view.Mode == BubbleMode.Closed)
-            {
-                _previewBubble = true;
-                ShowLimits();
-            }
-            else if (!editing && _previewBubble)
-            {
-                CloseBubble();
-            }
         }
 
         private void RefreshNow()
@@ -529,7 +509,6 @@ namespace DragonQuota
                     {
                         _completion = completed;
                         _completionSession = finishedSession;
-                        _previewBubble = false;
                         OpenBubble(BubbleMode.Limits, now);
                         if (!_quotaBusy && _nextQuota <= now.AddMinutes(1.7)) RefreshQuota();
                     }

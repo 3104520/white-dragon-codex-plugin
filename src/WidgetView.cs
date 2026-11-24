@@ -16,6 +16,8 @@ namespace DragonQuota
     {
         public const double BubbleWidth = 278;
         public const double BubbleHeight = 153;
+        public const double CompactBubbleWidth = 176;
+        public const double CompactBubbleHeight = 96;
         private static readonly FontFamily UiFont = new FontFamily("Segoe UI, Microsoft YaHei UI");
         private static readonly Brush Plum = Paint("#50386E");
         private static readonly Brush Ink = Paint("#46335A");
@@ -43,7 +45,8 @@ namespace DragonQuota
         private readonly DragonArt _art;
         private bool _dragging;
         private bool _breathing;
-        private bool _bubbleBelow;
+        private BubblePlacement _bubbleSide;
+        private bool _compact;
         private double _bubbleScale = 1;
 
         public readonly Canvas Bubble;
@@ -97,38 +100,58 @@ namespace DragonQuota
             };
             RenderOptions.SetBitmapScalingMode(Mascot, BitmapScalingMode.HighQuality);
             Children.Add(Mascot);
-            ArrangeWidget(new Size(329, 345), new Rect(178, 196, 149, 149), new Rect(15, 5, BubbleWidth, BubbleHeight), false, 100);
+            ArrangeWidget(new Size(329, 345), new Rect(178, 196, 149, 149),
+                new Rect(15, 5, BubbleWidth, BubbleHeight), BubblePlacement.Above, false, 100);
             ShowBubble(BubbleMode.Closed, false);
             IsVisibleChanged += (sender, args) => SyncBreathing();
         }
 
-        public void ArrangeWidget(Size viewport, Rect mascot, Rect bubble, bool below, int opacity)
+        public void ArrangePreview(double scale)
+        {
+            const double inset = 8;
+            var bubble = new Rect(inset, inset, CompactBubbleWidth * scale, CompactBubbleHeight * scale);
+            Mascot.Visibility = Visibility.Collapsed;
+            ArrangeWidget(new Size(bubble.Right + inset, bubble.Bottom + inset), new Rect(0, 0, 0, 0),
+                bubble, BubblePlacement.Overlay, true, 100);
+            ShowBubble(BubbleMode.Limits, false);
+        }
+
+        public void ArrangeWidget(Size viewport, Rect mascot, Rect bubble, BubblePlacement side, bool compact, int opacity)
         {
             Width = viewport.Width;
             Height = viewport.Height;
-            _bubbleBelow = below;
+            _bubbleSide = side;
+            _compact = compact;
             PlaceElement(Mascot, mascot);
             Mascot.Opacity = opacity / 100.0;
             PlaceElement(Bubble, bubble);
+            SetZIndex(Bubble, side == BubblePlacement.Overlay ? 1 : 0);
 
-            double scale = bubble.Width / BubbleWidth;
-            _bubbleScale = scale;
-            var shapeScale = new ScaleTransform(scale, bubble.Height / BubbleHeight);
+            _bubbleScale = Math.Min(bubble.Width / (compact ? CompactBubbleWidth : BubbleWidth),
+                bubble.Height / (compact ? CompactBubbleHeight : BubbleHeight));
+            var shapeScale = new ScaleTransform(bubble.Width / BubbleWidth, bubble.Height / BubbleHeight);
             _outline.RenderTransform = _glaze.RenderTransform = shapeScale;
-            LabelAt(_heading, 15, 12, 19, 254);
-            LabelAt(_value, 34, 12, 39, 254);
-            LabelAt(_weekly, 12.5, 12, 84, 254);
-            LabelAt(_context, 12, 12, 104, 254);
-            LabelAt(_tokens, 11.5, 12, 121, 254);
-            LabelAt(_dialogue, 16, 38, 51, 202);
-            _dialogue.MaxHeight = 74 * scale;
-
-            double center = mascot.X + mascot.Width / 2;
-            double fromX = Math.Max(bubble.Left + 19 * scale, Math.Min(bubble.Right - 19 * scale, center - 11 * scale));
-            double fromY = below ? bubble.Top : bubble.Bottom;
-            double toY = below ? mascot.Bottom : mascot.Top;
-            PositionThought(_thought, 21, 15, 3.1, fromX + (center - fromX) * .3, fromY + (toY - fromY) * .31, scale);
-            PositionThought(_smallThought, 12, 9, 2.8, fromX + (center - fromX) * .73, fromY + (toY - fromY) * .76, scale);
+            if (compact)
+            {
+                LabelAt(_heading, 13, 10, 12, 156, 10.5);
+                LabelAt(_value, 26, 10, 32, 156);
+                LabelAt(_weekly, 13, 12, 64, 152, 10.5);
+                LabelAt(_dialogue, 13, 21, 22, 134, 10.5);
+                _dialogue.MaxHeight = 54 * _bubbleScale;
+            }
+            else
+            {
+                LabelAt(_heading, 15, 12, 19, 254);
+                LabelAt(_value, 34, 12, 39, 254);
+                LabelAt(_weekly, 12.5, 12, 84, 254);
+                LabelAt(_context, 12, 12, 104, 254);
+                LabelAt(_tokens, 11.5, 12, 121, 254);
+                LabelAt(_dialogue, 16, 38, 51, 202);
+                _dialogue.MaxHeight = 74 * _bubbleScale;
+            }
+            PositionThoughts(mascot, bubble, side);
+            if (Mode != BubbleMode.Closed)
+                UpdateBubbleVisibility(_dragging ? Visibility.Collapsed : Visibility.Visible);
         }
 
         private static void PlaceElement(FrameworkElement item, Rect bounds)
@@ -139,12 +162,39 @@ namespace DragonQuota
             SetTop(item, bounds.Y);
         }
 
-        private void LabelAt(TextBlock label, double fontSize, double x, double y, double width)
+        private void LabelAt(TextBlock label, double fontSize, double x, double y, double width, double minimumFontSize = 0)
         {
-            label.FontSize = fontSize * _bubbleScale;
+            label.FontSize = Math.Max(minimumFontSize, fontSize * _bubbleScale);
             label.Width = width * _bubbleScale;
             SetLeft(label, x * _bubbleScale);
             SetTop(label, y * _bubbleScale);
+        }
+
+        private void PositionThoughts(Rect mascot, Rect bubble, BubblePlacement side)
+        {
+            if (side == BubblePlacement.Overlay) return;
+            var center = new Point(mascot.X + mascot.Width / 2, mascot.Y + mascot.Height / 2);
+            double scale = _bubbleScale;
+            double inset = 19 * scale;
+            Point from, to;
+            if (side == BubblePlacement.Left || side == BubblePlacement.Right)
+            {
+                bool left = side == BubblePlacement.Left;
+                from = new Point(left ? bubble.Right : bubble.Left,
+                    Math.Max(bubble.Top + inset, Math.Min(bubble.Bottom - inset, center.Y - 11 * scale)));
+                to = new Point(left ? mascot.Left : mascot.Right, center.Y);
+            }
+            else
+            {
+                bool below = side == BubblePlacement.Below;
+                from = new Point(Math.Max(bubble.Left + inset, Math.Min(bubble.Right - inset, center.X - 11 * scale)),
+                    below ? bubble.Top : bubble.Bottom);
+                to = new Point(center.X, below ? mascot.Bottom : mascot.Top);
+            }
+            var distance = to - from;
+            double trailScale = Math.Min(scale, distance.Length / 35);
+            PositionThought(_thought, 21, 15, 3.1, from.X + distance.X * .3, from.Y + distance.Y * .31, trailScale);
+            PositionThought(_smallThought, 12, 9, 2.8, from.X + distance.X * .73, from.Y + distance.Y * .76, trailScale);
         }
 
         private static void PositionThought(Ellipse item, double width, double height, double stroke, double x, double y, double scale)
@@ -191,32 +241,39 @@ namespace DragonQuota
                     var duration = TimeSpan.FromMilliseconds(220);
                     var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
                     Bubble.BeginAnimation(OpacityProperty, new DoubleAnimation(.22, 1, duration) { FillBehavior = FillBehavior.Stop });
-                    _bubbleLift.BeginAnimation(TranslateTransform.YProperty,
-                        new DoubleAnimation(_bubbleBelow ? -6 : 6, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+                    var bubbleOffset = _bubbleSide == BubblePlacement.Left || _bubbleSide == BubblePlacement.Above ? 6 : -6;
+                    var axis = _bubbleSide == BubblePlacement.Left || _bubbleSide == BubblePlacement.Right
+                        ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+                    _bubbleLift.BeginAnimation(axis,
+                        new DoubleAnimation(bubbleOffset, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
                 }
             }
             if (!animate || visibility == Visibility.Collapsed)
             {
                 Bubble.BeginAnimation(OpacityProperty, null);
+                _bubbleLift.BeginAnimation(TranslateTransform.XProperty, null);
                 _bubbleLift.BeginAnimation(TranslateTransform.YProperty, null);
             }
             Bubble.Visibility = visibility;
-            _thought.Visibility = visibility;
-            _smallThought.Visibility = visibility;
-            bool dialogue = mode == BubbleMode.Dialogue;
+            UpdateBubbleVisibility(visibility);
+        }
+
+        private void UpdateBubbleVisibility(Visibility visibility)
+        {
+            _thought.Visibility = _smallThought.Visibility = _bubbleSide == BubblePlacement.Overlay ? Visibility.Collapsed : visibility;
+            bool dialogue = Mode == BubbleMode.Dialogue;
             _dialogue.Visibility = dialogue ? Visibility.Visible : Visibility.Collapsed;
             var data = dialogue ? Visibility.Collapsed : Visibility.Visible;
             _value.Visibility = data;
             _weekly.Visibility = data;
-            _context.Visibility = data;
-            _tokens.Visibility = data;
+            _context.Visibility = _tokens.Visibility = _compact ? Visibility.Collapsed : data;
             _heading.Visibility = data;
         }
 
         public void SetDialogue(string text)
         {
             _dialogue.Text = text;
-            Bubble.ToolTip = null;
+            Bubble.ToolTip = text;
         }
 
         public void SetLimits(QuotaSample quota, LocalUsage local, bool loading, DateTimeOffset now, TurnSummary completion = null)
@@ -224,19 +281,30 @@ namespace DragonQuota
             RateWindow main = quota == null ? null : quota.Short ?? quota.Long;
             RateWindow weekly = quota == null || main == quota.Long ? null : quota.Long;
             string pool = quota == null ? "Codex" : quota.Name ?? "Codex";
-            _heading.Text = completion != null ? "本轮已完成" : main == null ? "Codex 额度" : pool + " · " + WindowName(main) + "额度";
+            _heading.Text = completion != null ? "本轮已完成" : main == null ? "Codex 额度" :
+                (_compact ? "" : pool + " · ") + WindowName(main) + "额度";
 
             bool resetPassed = main != null && main.ResetsAt.HasValue && main.ResetsAt.Value <= now;
             _value.Inlines.Clear();
             _value.Foreground = main == null || resetPassed ? Muted : RemainingColor(main.Remaining);
             if (main == null || resetPassed)
             {
-                _value.Inlines.Add(new Run(loading ? "读取中…" : resetPassed ? "等待同步" : "额度暂不可用") { FontSize = 23 * _bubbleScale });
+                _value.Inlines.Add(new Run(loading ? "读取中…" : resetPassed ? "等待同步" : "额度暂不可用") {
+                    FontSize = (_compact ? 18 : 23) * _bubbleScale
+                });
             }
             else
             {
-                _value.Inlines.Add(new Run("剩余 ") { FontSize = 17 * _bubbleScale, FontWeight = FontWeights.SemiBold });
+                _value.Inlines.Add(new Run("剩余 ") { FontSize = (_compact ? 13 : 17) * _bubbleScale, FontWeight = FontWeights.SemiBold });
                 _value.Inlines.Add(new Run(Percent(main.Remaining)));
+            }
+
+            Bubble.ToolTip = Details(quota, local, now);
+            if (_compact)
+            {
+                _weekly.Text = main == null ? "" : !main.ResetsAt.HasValue ? "重置时间未知" :
+                    resetPassed ? "重置后待同步" : "重置 " + LocalTime(main.ResetsAt.Value, now);
+                return;
             }
 
             string reset = ResetText(main, now);
@@ -267,7 +335,6 @@ namespace DragonQuota
                 _tokens.Text = (source.Length > 0 ? source : "最近 Codex 会话") + " · " + tokens;
             }
             else _tokens.Text = source;
-            Bubble.ToolTip = Details(quota, local, now);
         }
 
         public void Poke()
@@ -282,7 +349,7 @@ namespace DragonQuota
 
         private void SyncBreathing()
         {
-            bool animate = IsVisible && !_dragging;
+            bool animate = IsVisible && Mascot.Visibility == Visibility.Visible && !_dragging;
             if (animate == _breathing) return;
             _breathing = animate;
             if (!animate)

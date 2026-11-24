@@ -11,6 +11,7 @@ $programs = Join-Path $env:LOCALAPPDATA 'Programs'
 $installDir = Join-Path $programs 'WhiteDragonCodexPlugin'
 $marketplace = Join-Path $installDir 'marketplace'
 $startupPath = Join-Path $installDir 'WhiteDragonStartup.exe'
+$uninstallScript = Join-Path $installDir 'install.ps1'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $runName = 'WhiteDragonCodexPlugin'
 $marketFiles = @(
@@ -27,13 +28,35 @@ function Get-CodexExecutable {
         $candidate = Join-Path $package.InstallLocation 'app\resources\codex.exe'
         if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
     }
-    throw 'Install or update Codex for Windows from the Microsoft Store first.'
 }
 
 function Invoke-Codex {
     param([string[]]$Arguments)
     & $codex @Arguments
     if ($LASTEXITCODE -ne 0) { throw ('Codex command failed: ' + ($Arguments -join ' ')) }
+}
+
+function Get-RegisteredMarketplace {
+    param([switch]$IncludeDisabled)
+    $arguments = @('plugin', 'marketplace', 'list', '--json')
+    if ($IncludeDisabled) { $arguments += @('--enable', 'plugins') }
+    $sourceList = (Invoke-Codex -Arguments $arguments | Out-String) | ConvertFrom-Json
+    $sourceList.marketplaces | Where-Object { $_.name -eq $marketName } | Select-Object -First 1
+}
+
+function Get-RunEntry {
+    param([string]$Name)
+    $properties = Get-ItemProperty -LiteralPath $runKey -ErrorAction SilentlyContinue
+    if ($null -ne $properties) {
+        $entry = $properties.PSObject.Properties[$Name]
+        if ($null -ne $entry) { return $entry.Value }
+    }
+}
+
+function Remove-StartupRunEntry {
+    if ($null -ne (Get-RunEntry -Name $runName)) {
+        Remove-ItemProperty -LiteralPath $runKey -Name $runName
+    }
 }
 
 function Get-StartupProcess {
@@ -50,7 +73,7 @@ function Stop-Startup {
 
 function Test-LegacyMonitor {
     $legacyPath = Join-Path $programs 'DragonCodexBoot\DragonCodexBoot.exe'
-    $command = Get-ItemPropertyValue -LiteralPath $runKey -Name 'DragonCodexBootMonitor' -ErrorAction SilentlyContinue
+    $command = Get-RunEntry -Name 'DragonCodexBootMonitor'
     $expected = '"{0}" --monitor' -f $legacyPath
     if ($command -ne $expected -or -not (Test-Path -LiteralPath $legacyPath -PathType Leaf)) { return $false }
     $assemblyText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($legacyPath))
@@ -67,9 +90,10 @@ function Copy-PayloadFile {
 if (-not [Environment]::Is64BitProcess) {
     throw 'Run this package with 64-bit PowerShell on Windows x64.'
 }
-$codex = Get-CodexExecutable
 
 if (-not $Uninstall) {
+    $codex = Get-CodexExecutable
+    if (-not $codex) { throw 'Install or update Codex for Windows from the Microsoft Store first.' }
     $payload = Join-Path $PSScriptRoot 'marketplace'
     $startupSource = Join-Path $PSScriptRoot 'startup\bin\WhiteDragonStartup.exe'
     foreach ($relativePath in $marketFiles) {
@@ -103,44 +127,61 @@ try {
     catch [Threading.AbandonedMutexException] { $locked = $true }
     if (-not $locked) { throw 'Another White Dragon installation is in progress.' }
 
-    $sourceList = (Invoke-Codex -Arguments @('plugin', 'marketplace', 'list', '--json') | Out-String) | ConvertFrom-Json
-    $configured = @($sourceList.marketplaces | Where-Object { $_.name -eq $marketName })
-    if ($configured.Count -gt 0 -and $configured[0].root -ne $marketplace) {
-        throw "A White Dragon source is already registered at $($configured[0].root). See Existing installations in README.md."
-    }
-
     if ($Uninstall) {
-        if ($configured.Count -gt 0) {
-            Invoke-Codex -Arguments @('plugin', 'remove', $pluginId)
-            Invoke-Codex -Arguments @('plugin', 'marketplace', 'remove', $marketName)
-        }
-        if (Get-ItemPropertyValue -LiteralPath $runKey -Name $runName -ErrorAction SilentlyContinue) {
-            Remove-ItemProperty -LiteralPath $runKey -Name $runName
-        }
+        Remove-StartupRunEntry
         Stop-Startup
+        $registrationCleared = $false
+        try {
+            $codex = Get-CodexExecutable
+            if ($codex) {
+                $configured = Get-RegisteredMarketplace -IncludeDisabled
+                $ownsSource = $configured -and $configured.root -eq $marketplace
+                $localCatalog = Join-Path $marketplace $marketFiles[0]
+                if ($ownsSource -or (-not $configured -and (Test-Path -LiteralPath $localCatalog -PathType Leaf))) {
+                    Invoke-Codex -Arguments @('plugin', 'remove', $pluginId, '--enable', 'plugins')
+                }
+                if ($ownsSource) { Invoke-Codex -Arguments @('plugin', 'marketplace', 'remove', $marketName, '--enable', 'plugins') }
+                $registrationCleared = $true
+            } else {
+                Write-Warning 'Codex is unavailable. To remove its marketplace registration, rerun uninstall after restoring Codex.'
+            }
+        } catch {
+            Write-Warning ('Codex registration cleanup failed. Rerun uninstall to retry. ' + $_.Exception.Message)
+        }
+
         $installedFiles = @($startupPath, (Join-Path $installDir 'logs\monitor.log'))
-        $installedFiles += $marketFiles | ForEach-Object { Join-Path $marketplace $_ }
+        if ($registrationCleared) {
+            $installedFiles += $uninstallScript
+            $installedFiles += $marketFiles | ForEach-Object { Join-Path $marketplace $_ }
+        } else {
+            # Codex needs the manifests intact to list the registered source on a retry.
+            $installedFiles += $marketFiles | Select-Object -Skip 2 | ForEach-Object { Join-Path $marketplace $_ }
+        }
         foreach ($file in $installedFiles) {
             if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file -Force }
         }
-        Write-Output 'White Dragon removed.'
+        Write-Output 'White Dragon startup component and runtime files were removed.'
         return
     }
 
+    $configured = Get-RegisteredMarketplace
+    if ($configured -and $configured.root -ne $marketplace) {
+        throw "A White Dragon source is already registered at $($configured.root). See Existing installations in README.md."
+    }
+
+    Copy-PayloadFile -Source $PSCommandPath -Target $uninstallScript
     foreach ($relativePath in $marketFiles) {
         Copy-PayloadFile -Source (Join-Path $payload $relativePath) -Target (Join-Path $marketplace $relativePath)
     }
-    if ($configured.Count -eq 0) {
+    if (-not $configured) {
         Invoke-Codex -Arguments @('plugin', 'marketplace', 'add', $marketplace)
     }
     Invoke-Codex -Arguments @('plugin', 'add', $pluginId)
 
     if (Test-LegacyMonitor) {
-        if (Get-ItemPropertyValue -LiteralPath $runKey -Name $runName -ErrorAction SilentlyContinue) {
-            Remove-ItemProperty -LiteralPath $runKey -Name $runName
-        }
+        Remove-StartupRunEntry
         Stop-Startup
-        Write-Output 'Using the existing Dragon Codex Boot startup component.'
+        Write-Output 'Using the existing Dragon Codex Boot startup registration.'
     } else {
         $startupNeedsCopy = -not (Test-Path -LiteralPath $startupPath -PathType Leaf)
         if (-not $startupNeedsCopy) {
@@ -152,7 +193,13 @@ try {
         }
         if (-not (Test-Path -LiteralPath $runKey)) { $null = New-Item -Path $runKey }
         $null = New-ItemProperty -LiteralPath $runKey -Name $runName -Value ('"{0}"' -f $startupPath) -PropertyType String -Force
-        if (-not (Get-StartupProcess)) { Start-Process -FilePath $startupPath -WindowStyle Hidden }
+        if (-not (Get-StartupProcess)) {
+            $started = Start-Process -FilePath $startupPath -WindowStyle Hidden -PassThru
+            if ($started.WaitForExit(750) -and -not (Get-StartupProcess)) {
+                throw "The startup component exited with code $($started.ExitCode). Run Install.cmd again to retry."
+            }
+        }
+        Write-Output 'White Dragon startup component is running.'
     }
     Write-Output "White Dragon $($manifest.version) installed. Open the Codex desktop app."
 } finally {

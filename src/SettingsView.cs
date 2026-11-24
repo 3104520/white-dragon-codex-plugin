@@ -14,6 +14,7 @@ namespace DragonQuota
     {
         private readonly WidgetSettings _settings;
         private readonly DragonArt _art;
+        private readonly WidgetView _bubblePreview;
         private readonly Action _apply;
         private readonly Dictionary<DockCorner, Button> _corners = new Dictionary<DockCorner, Button>();
         private readonly Dictionary<DragonPose, Image> _pictures = new Dictionary<DragonPose, Image>();
@@ -25,6 +26,8 @@ namespace DragonQuota
             _settings = settings;
             _art = art;
             _apply = apply;
+            _bubblePreview = new WidgetView(art) { HorizontalAlignment = HorizontalAlignment.Center, IsHitTestVisible = false };
+            AutomationProperties.SetName(_bubblePreview, "额度气泡预览");
             AddSlider("挂件大小", 64, 180, settings.MascotSize, "px", value => settings.MascotSize = value);
             AddBubbleSize();
             AddSlider("龙娘透明度", 35, 100, settings.Opacity, "%", value => settings.Opacity = value);
@@ -48,6 +51,11 @@ namespace DragonQuota
                 PanelTheme.Highlight(corner.Value, !_settings.Position.HasValue && corner.Key == _settings.Corner);
         }
 
+        public void UpdateBubblePreview(QuotaSample quota, LocalUsage session, bool loading, DateTimeOffset now)
+        {
+            _bubblePreview.SetLimits(quota, session, loading, now);
+        }
+
         private void AddSlider(string title, int min, int max, int value, string suffix, Action<int> apply)
         {
             var indicator = PanelTheme.Text(value + suffix, 12, PanelTheme.Purple, true);
@@ -68,7 +76,15 @@ namespace DragonQuota
         {
             var indicator = PanelTheme.Text("", 12, PanelTheme.Purple, true);
             Children.Add(PanelTheme.Row(PanelTheme.Text("气泡大小", 13, bold: true), indicator));
-            var row = new UniformGrid { Columns = 6, Margin = new Thickness(0, 7, 0, 15) };
+            var row = new UniformGrid { Columns = 6, Margin = new Thickness(0, 7, 0, 2) };
+            var preview = new Border { Child = _bubblePreview, ClipToBounds = true, Margin = new Thickness(0, 0, 0, 10) };
+            Action fitPreview = () => {
+                double width = preview.ActualWidth > 0 ? preview.ActualWidth : TelemetryPanel.PanelWidth - 50;
+                double maximum = Math.Max(.65, Math.Min(1.6, (width - 16) / WidgetView.CompactBubbleWidth));
+                double fraction = (_settings.BubbleSize - 65) / 95.0;
+                _bubblePreview.ArrangePreview(.65 + fraction * (maximum - .65));
+            };
+            preview.SizeChanged += (sender, args) => { if (args.WidthChanged) fitPreview(); };
             var presets = new Dictionary<int, Button>();
             Action update = () => {
                 double scale = _settings.BubbleSize / 100.0;
@@ -77,6 +93,7 @@ namespace DragonQuota
                 foreach (var item in presets) PanelTheme.Highlight(item.Value, item.Key == _settings.BubbleSize);
                 row.Children[0].IsEnabled = _settings.BubbleSize > 65;
                 row.Children[5].IsEnabled = _settings.BubbleSize < 160;
+                fitPreview();
             };
             Action<int> set = value => {
                 _settings.BubbleSize = Math.Max(65, Math.Min(160, value));
@@ -90,6 +107,7 @@ namespace DragonQuota
             AddBubblePreset(row, presets, "超大", 150, set);
             AddCell(row, PanelTheme.Button("+", () => set(_settings.BubbleSize + 5)));
             Children.Add(row);
+            Children.Add(preview);
             update();
         }
 

@@ -178,6 +178,7 @@ namespace DragonQuota
             }
             if (Page == PanelPage.Summary) RenderSummary();
             if (Page == PanelPage.Context) RenderContext();
+            if (_preferences != null) _preferences.UpdateBubblePreview(_quota, _session, _loading, _at);
         }
 
         private void RenderSummary()

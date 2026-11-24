@@ -8,7 +8,7 @@
 
 需要 Windows 11 x64，以及从 Microsoft Store 安装并已登录的 Codex 桌面版。安装在当前 Windows 用户下，使用系统自带的 .NET Framework。
 
-1. 下载 `white-dragon-codex-plugin-3.0.2-windows-x64.zip`，解压整个 ZIP。 [GitHub Releases](https://github.com/3104520/white-dragon-codex-plugin/releases/latest)
+1. 下载最新的 `white-dragon-codex-plugin-*-windows-x64.zip`，解压整个 ZIP。 [GitHub Releases](https://github.com/3104520/white-dragon-codex-plugin/releases/latest)
 2. 在解压目录中双击 `Install.cmd`。
 3. 打开 Codex 桌面版。挂件默认出现在窗口右下角。若插件列表还未更新，重启一次 Codex。
 
@@ -17,9 +17,9 @@
 ## 使用
 
 - **拖动白龙**可以在 Codex 窗口内自由摆放，松手后保存位置。手动选择角落时会使用该角落的位置。
-- **左键单击**显示短周期和每周额度。再点一次可以切换自定义对白。一次对话完成时自动弹出额度气泡，约 10 秒后收起。
+- **左键单击**显示短周期和每周额度。再点一次可以切换自定义对白。一次对话完成时自动弹出额度气泡，约 10 秒后收起。空间不足时气泡会改到白龙侧边，或切换为仅显示额度和重置时间的紧凑布局。
 - **右键单击**打开统计面板，可查看上下文长度、累计 Token、缓存命中率及会话明细。
-- **挂件设置**支持调整形象大小、气泡大小和透明度，替换待机、思考、戳一下和庆祝形象，编辑气泡对白，切换统计栏及完成提醒。
+- **挂件设置**支持调整形象大小、气泡大小和透明度，替换待机、思考、戳一下和庆祝形象，编辑气泡对白，切换统计栏及完成提醒。设置页内的气泡会持续预览当前大小。
 
 <img src="docs/preview.png" alt="统计面板和挂件设置预览，数值为演示数据" width="600">
 
@@ -29,10 +29,10 @@
 
 更新时解压新版 ZIP 并再次运行 `Install.cmd`。平时可在 Codex 的插件列表开关白龙额度。
 
-使用发行包安装的用户可在解压目录中运行以下命令卸载插件和它的启动组件。
+使用发行包安装的用户可以在 PowerShell 中运行以下命令，卸载插件并清理本版本注册的 Windows 启动项。
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\WhiteDragonCodexPlugin\install.ps1" -Uninstall
 ```
 
 ### 已有本地安装
