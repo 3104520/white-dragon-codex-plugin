@@ -1,0 +1,12 @@
+{
+  "name": "white-dragon-local",
+  "interface": { "displayName": "白龙本地插件" },
+  "plugins": [
+    {
+      "name": "white-dragon",
+      "source": { "source": "local", "path": "./plugins/white-dragon" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

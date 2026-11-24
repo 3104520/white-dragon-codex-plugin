@@ -1,0 +1,9 @@
+/dist/
+/startup/bin/
+/assets/dragon.ico
+/marketplace/plugins/white-dragon/assets/
+/marketplace/plugins/white-dragon/runtime/
+*.settings.json
+*.settings.json.tmp
+custom-assets/
+logs/

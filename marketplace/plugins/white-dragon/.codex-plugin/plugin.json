@@ -1,0 +1,13 @@
+{
+  "name": "white-dragon",
+  "version": "3.0.2",
+  "description": "显示本机 Codex 额度和会话统计的白龙娘挂件。",
+  "interface": {
+    "displayName": "白龙额度",
+    "shortDescription": "随 Codex 启动的静音额度挂件",
+    "longDescription": "白龙娘可在 Codex 窗口内自由摆放。点开气泡查看额度，右键查看会话统计、上下文观察和挂件设置。",
+    "category": "Productivity",
+    "composerIcon": "./assets/dragon.png",
+    "logo": "./assets/dragon.png"
+  }
+}
