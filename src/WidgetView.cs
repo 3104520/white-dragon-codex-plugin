@@ -22,9 +22,6 @@ namespace DragonQuota
         private static readonly Brush Ink = Paint("#46335A");
         private static readonly Brush Muted = Paint("#4A3D60");
         private static readonly Brush LightInk = Paint("#564968");
-        private static readonly Brush Mint = Paint("#187E5A");
-        private static readonly Brush Amber = Paint("#9E561B");
-        private static readonly Brush Rose = Paint("#A03562");
         private static readonly Brush Porcelain = Paint("#FEFAFF");
         private static readonly CultureInfo Culture = CultureInfo.InvariantCulture;
 
@@ -47,6 +44,7 @@ namespace DragonQuota
         private bool _breathing;
         private BubblePlacement _bubbleSide;
         private bool _compact;
+        private bool _tight;
         private double _bubbleScale = 1;
 
         public readonly Canvas Bubble;
@@ -58,10 +56,9 @@ namespace DragonQuota
             _art = art ?? new DragonArt(new WidgetSettings());
             UseLayoutRounding = true;
             SnapsToDevicePixels = true;
-            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            WidgetFonts.SmoothText(this);
 
             Bubble = new Canvas { Cursor = System.Windows.Input.Cursors.Hand, RenderTransform = _bubbleLift };
-            RenderOptions.SetClearTypeHint(Bubble, ClearTypeHint.Enabled);
             _outline = new Path {
                 Data = Geometry.Parse("M 132 5 C 200 3 260 27 272 64 C 287 107 242 139 171 146 C 98 154 35 138 12 108 C -13 76 9 39 50 22 C 74 12 101 6 132 5 Z"),
                 Fill = new LinearGradientBrush(ColorOf("#FFFCFF"), ColorOf("#F7F0FE"), 90),
@@ -78,7 +75,7 @@ namespace DragonQuota
             Bubble.Children.Add(_glaze);
 
             _heading = MakeLabel(Ink, FontWeights.SemiBold);
-            _value = MakeLabel(Mint, FontWeights.Bold);
+            _value = MakeLabel(Ink, FontWeights.Bold);
             _weekly = MakeLabel(Ink, FontWeights.SemiBold);
             _context = MakeLabel(Muted, FontWeights.Medium);
             _tokens = MakeLabel(LightInk, FontWeights.Medium);
@@ -111,6 +108,7 @@ namespace DragonQuota
         public void ArrangePreview(double scale)
         {
             const double inset = 8;
+            scale = WidgetLayout.CompactScale(scale);
             var bubble = new Rect(inset, inset, CompactBubbleWidth * scale, CompactBubbleHeight * scale);
             Mascot.Visibility = Visibility.Collapsed;
             ArrangeWidget(new Size(bubble.Right + inset, bubble.Bottom + inset), new Rect(0, 0, 0, 0),
@@ -131,23 +129,24 @@ namespace DragonQuota
 
             _bubbleScale = Math.Min(bubble.Width / (compact ? CompactBubbleWidth : BubbleWidth),
                 bubble.Height / (compact ? CompactBubbleHeight : BubbleHeight));
+            _tight = compact && _bubbleScale < .82;
             var shapeScale = new ScaleTransform(bubble.Width / BubbleWidth, bubble.Height / BubbleHeight);
             _outline.RenderTransform = _glaze.RenderTransform = shapeScale;
             if (compact)
             {
-                LabelAt(_heading, 13, 10, 12, 156, 10.5);
-                LabelAt(_value, 26, 10, 32, 156);
-                LabelAt(_weekly, 13, 12, 64, 152, 10.5);
-                LabelAt(_dialogue, 13, 21, 22, 134, 10.5);
-                _dialogue.MaxHeight = 54 * _bubbleScale;
+                LabelAt(_heading, 14, 9, 9, 158, 13);
+                LabelAt(_value, 29, 8, _tight ? 12 : 32, 160, 24);
+                LabelAt(_weekly, 13, 12, _tight ? 61 : 67, 152, 12.5);
+                LabelAt(_dialogue, 14, 21, 17, 134, 13);
+                _dialogue.MaxHeight = 64 * _bubbleScale;
             }
             else
             {
-                LabelAt(_heading, 15, 12, 19, 254);
-                LabelAt(_value, 34, 12, 39, 254);
-                LabelAt(_weekly, 12.5, 12, 84, 254);
-                LabelAt(_context, 12, 12, 104, 254);
-                LabelAt(_tokens, 11.5, 12, 121, 254);
+                LabelAt(_heading, 15, 12, 18, 254, 14);
+                LabelAt(_value, 34, 12, 38, 254, 30);
+                LabelAt(_weekly, 13, 12, 83, 254, 12);
+                LabelAt(_context, 13, 12, 102, 254, 12);
+                LabelAt(_tokens, 12.5, 12, 120, 254, 12);
                 LabelAt(_dialogue, 16, 38, 51, 202);
                 _dialogue.MaxHeight = 74 * _bubbleScale;
             }
@@ -269,7 +268,7 @@ namespace DragonQuota
             _value.Visibility = data;
             _weekly.Visibility = data;
             _context.Visibility = _tokens.Visibility = _compact ? Visibility.Collapsed : data;
-            _heading.Visibility = data;
+            _heading.Visibility = _tight ? Visibility.Collapsed : data;
         }
 
         public void SetDialogue(string text)
@@ -289,17 +288,18 @@ namespace DragonQuota
 
             bool resetPassed = main != null && main.ResetsAt.HasValue && main.ResetsAt.Value <= now;
             _value.Inlines.Clear();
-            _value.Foreground = _rim.Accent(main == null || resetPassed ? Muted : RemainingColor(main.Remaining));
+            _value.Foreground = main == null || resetPassed ? _rim.Accent(Muted) : _rim.Ink;
             if (main == null || resetPassed)
             {
                 _value.Inlines.Add(new Run(loading ? "读取中…" : resetPassed ? "等待同步" : "额度暂不可用") {
-                    FontSize = (_compact ? 18 : 23) * _bubbleScale
+                    FontSize = Math.Max(14, (_compact ? 18 : 23) * _bubbleScale)
                 });
             }
             else
             {
-                _value.Inlines.Add(new Run("剩余 ") { FontSize = (_compact ? 13 : 17) * _bubbleScale, FontWeight = FontWeights.SemiBold });
-                _value.Inlines.Add(new Run(Percent(main.Remaining)) { FontFamily = WidgetFonts.Mono });
+                if (!_compact)
+                    _value.Inlines.Add(new Run("剩余 ") { FontSize = Math.Max(14, 17 * _bubbleScale), FontWeight = FontWeights.SemiBold });
+                _value.Inlines.Add(new Run(Percent(main.Remaining)) { FontFamily = WidgetFonts.Mono, Foreground = _rim.QuotaInk });
             }
 
             Bubble.ToolTip = (String.IsNullOrEmpty(status) ? "" : status + "\n") + Details(quota, local, now);
@@ -307,7 +307,8 @@ namespace DragonQuota
             {
                 _weekly.Text = main == null ? "" : !main.ResetsAt.HasValue ? "重置时间未知" :
                     resetPassed ? "重置后待同步" : "重置 " + LocalTime(main.ResetsAt.Value, now);
-                if (main != null && status != null && status.Contains("缓存")) _weekly.Text += " · 缓存";
+                if (main != null && status != null && status.Contains("缓存"))
+                    _weekly.Text = _tight ? "额度缓存" : _weekly.Text + " · 缓存";
                 return;
             }
 
@@ -410,13 +411,6 @@ namespace DragonQuota
             if (local != null && local.At != default(DateTimeOffset))
                 text += "\nToken 来自最近记录的 Codex 会话 · " + LocalTime(local.At, now);
             return text;
-        }
-
-        private static Brush RemainingColor(double remaining)
-        {
-            if (remaining <= 15) return Rose;
-            if (remaining <= 35) return Amber;
-            return Mint;
         }
 
         public static string WindowName(RateWindow window)

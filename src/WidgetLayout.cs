@@ -41,12 +41,13 @@ namespace DragonQuota
             double baseWidth = WidgetView.BubbleWidth, baseHeight = WidgetView.BubbleHeight;
             double fit;
             var direction = BestSide(inner, mascot, baseWidth, baseHeight, gap, sideGap, requested, out fit);
-            bool compact = fit < Math.Min(requested, .9 * dpi);
+            bool compact = UsesCompactBubble(requested / dpi) || fit < .9 * dpi;
             if (compact)
             {
                 baseWidth = WidgetView.CompactBubbleWidth;
                 baseHeight = WidgetView.CompactBubbleHeight;
                 gap = sideGap;
+                requested = CompactScale(requested / dpi) * dpi;
                 direction = BestSide(inner, mascot, baseWidth, baseHeight, gap, sideGap, requested, out fit);
                 if (fit < Math.Min(requested, .85 * dpi))
                 {
@@ -89,6 +90,14 @@ namespace DragonQuota
                 BubbleSide = direction,
                 CompactBubble = compact
             };
+        }
+
+        public static bool UsesCompactBubble(double scale) { return scale < .9; }
+
+        public static double CompactScale(double scale)
+        {
+            // Give the small presets enough room for legible type while keeping their size differences.
+            return scale < 1 ? .84 + (scale - .65) * (.16 / .35) : scale;
         }
 
         private static BubblePlacement BestSide(NativeWindows.Bounds inner, Int32Rect mascot, double width, double height,

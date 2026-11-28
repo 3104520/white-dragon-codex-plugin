@@ -18,7 +18,9 @@ $marketFiles = @(
     '.agents\plugins\marketplace.json',
     'plugins\white-dragon\.codex-plugin\plugin.json',
     'plugins\white-dragon\assets\dragon.png',
-    'plugins\white-dragon\runtime\DragonQuota.Plugin.dll'
+    'plugins\white-dragon\runtime\DragonQuota.Plugin.dll',
+    'plugins\white-dragon\assets\fonts\ResourceHanRoundedCN-Regular.ttf',
+    'plugins\white-dragon\assets\fonts\Resource-Han-Rounded-OFL.txt'
 )
 
 function Get-CodexExecutable {

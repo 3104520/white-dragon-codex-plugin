@@ -80,6 +80,11 @@ if ($diagnostic) {
     $iconDir = Join-Path $package 'assets'
     $null = New-Item -ItemType Directory -Force -Path $iconDir
     Copy-Item -LiteralPath $assetPath -Destination (Join-Path $iconDir 'dragon.png') -Force
+    $fontOutput = Join-Path $iconDir 'fonts'
+    $null = New-Item -ItemType Directory -Force -Path $fontOutput
+    foreach ($file in 'ResourceHanRoundedCN-Regular.ttf', 'Resource-Han-Rounded-OFL.txt') {
+        Copy-Item -LiteralPath (Join-Path $projectDir "assets\fonts\$file") -Destination $fontOutput -Force
+    }
 }
 $sources = @(Get-ChildItem -LiteralPath $sourceDir -Filter '*.cs' -File | Select-Object -ExpandProperty FullName)
 & $compiler @parameters @sources

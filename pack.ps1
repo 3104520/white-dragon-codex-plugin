@@ -23,6 +23,8 @@ $files = @(
     'marketplace/.agents/plugins/marketplace.json',
     'marketplace/plugins/white-dragon/.codex-plugin/plugin.json',
     'marketplace/plugins/white-dragon/assets/dragon.png',
+    'marketplace/plugins/white-dragon/assets/fonts/ResourceHanRoundedCN-Regular.ttf',
+    'marketplace/plugins/white-dragon/assets/fonts/Resource-Han-Rounded-OFL.txt',
     'marketplace/plugins/white-dragon/runtime/DragonQuota.Plugin.dll'
 )
 

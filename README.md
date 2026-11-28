@@ -22,7 +22,7 @@
 - **刷新额度**会立即查询，面板和主气泡会显示额度来源和数据时间。面板右上角的「复制」可复制额度摘要和重置时间。
 - **挂件设置**支持调整形象大小、气泡大小和透明度，替换待机、思考、戳一下和庆祝形象，编辑气泡对白，切换统计栏及完成提醒。设置页内的气泡会持续预览当前大小。
 
-额度气泡和详情面板可见时，边框会在浅金、淡紫和雾蓝之间流动，标题和额度数字也有流光。挂件优先使用系统已有的 Anthropic Sans、Serif 和 Mono，中文字形使用微软雅黑 UI 补齐。流光跟随 Windows 的动画效果设置。
+额度气泡和详情面板可见时，边框会在浅金、淡紫和雾蓝之间流动，标题和额度数字也有流光。小尺寸气泡使用独立的紧凑排版。挂件优先使用系统已有的 Anthropic Sans、Serif 和 Mono。中文采用随插件加载的资源圆体 CN，透明窗口使用灰度抗锯齿。流光跟随 Windows 的动画效果设置。 [资源圆体](https://github.com/CyanoHao/Resource-Han-Rounded) · [字体许可](https://github.com/CyanoHao/Resource-Han-Rounded/blob/v0.990/LICENSE.txt)
 
 <img src="docs/preview.png" alt="统计面板和挂件设置预览，数值为演示数据" width="600">
 

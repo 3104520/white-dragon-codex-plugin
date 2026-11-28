@@ -24,6 +24,8 @@ namespace DragonQuota
             ShowActivated = false;
             ShowInTaskbar = false;
             Topmost = true;
+            UseLayoutRounding = true;
+            WidgetFonts.SmoothText(this);
             _text = PanelTheme.Text("", 11, PanelTheme.Ink);
             _text.TextAlignment = TextAlignment.Center;
             Content = new Border {

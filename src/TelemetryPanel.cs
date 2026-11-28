@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 
@@ -66,6 +67,7 @@ namespace DragonQuota
             AllowsTransparency = true;
             Background = Brushes.Transparent;
             UseLayoutRounding = true;
+            WidgetFonts.SmoothText(this);
             var paper = new LinearGradientBrush(Color.FromArgb(251, 255, 252, 247), Color.FromArgb(248, 248, 243, 254), 115);
             var liner = new Border {
                 BorderBrush = WidgetView.Paint("#B5E8D4AC"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(13),
@@ -75,6 +77,7 @@ namespace DragonQuota
                 Background = paper, BorderBrush = _rim.Brush, BorderThickness = new Thickness(2),
                 CornerRadius = new CornerRadius(16), Child = liner
             };
+            WidgetFonts.SmoothText(shell);
             Content = shell;
             IsVisibleChanged += (sender, args) => _rim.SetVisible(IsVisible);
             _toolbar.Margin = new Thickness(0, 0, 0, 12);
@@ -396,10 +399,14 @@ namespace DragonQuota
             if (window == null) return;
             bool expired = window.ResetsAt.HasValue && window.ResetsAt.Value <= _at;
             var color = expired ? PanelTheme.Muted : PanelTheme.QuotaColor(window.Remaining);
-            string right = expired ? "等待同步" : "剩 " + WidgetView.Percent(window.Remaining);
-            if (!expired && window.ResetsAt.HasValue) right += "  ·  " + WidgetView.ResetText(window, _at);
-            panel.Children.Add(PanelTheme.Row(PanelTheme.Text(WidgetView.WindowName(window), 11.5, _rim.Ink),
-                PanelTheme.Text(right, 11, _rim.Accent(color), true)));
+            var right = PanelTheme.Text(expired ? "等待同步" : "", 11, expired ? _rim.Accent(color) : _rim.Ink, true);
+            if (!expired)
+            {
+                right.Inlines.Add(new Run("剩 "));
+                right.Inlines.Add(new Run(WidgetView.Percent(window.Remaining)) { Foreground = _rim.QuotaInk });
+                if (window.ResetsAt.HasValue) right.Inlines.Add(new Run("  ·  " + WidgetView.ResetText(window, _at)));
+            }
+            panel.Children.Add(PanelTheme.Row(PanelTheme.Text(WidgetView.WindowName(window), 11.5, _rim.Ink), right));
             panel.Children.Add(PanelTheme.Progress(expired ? (double?)null : window.Remaining, color));
         }
 

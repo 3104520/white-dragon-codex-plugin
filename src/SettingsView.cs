@@ -109,8 +109,10 @@ namespace DragonQuota
             var presets = new Dictionary<int, Button>();
             Action update = () => {
                 double scale = _settings.BubbleSize / 100.0;
-                indicator.Text = _settings.BubbleSize + "% · " + Math.Round(WidgetView.BubbleWidth * scale) +
-                    "×" + Math.Round(WidgetView.BubbleHeight * scale);
+                bool compact = WidgetLayout.UsesCompactBubble(scale);
+                double width = compact ? WidgetView.CompactBubbleWidth * WidgetLayout.CompactScale(scale) : WidgetView.BubbleWidth * scale;
+                double height = compact ? WidgetView.CompactBubbleHeight * WidgetLayout.CompactScale(scale) : WidgetView.BubbleHeight * scale;
+                indicator.Text = _settings.BubbleSize + "% · " + Math.Round(width) + "×" + Math.Round(height);
                 foreach (var item in presets) PanelTheme.Highlight(item.Value, item.Key == _settings.BubbleSize);
                 row.Children[0].IsEnabled = _settings.BubbleSize > 65;
                 row.Children[5].IsEnabled = _settings.BubbleSize < 160;

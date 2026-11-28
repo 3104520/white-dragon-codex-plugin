@@ -11,8 +11,8 @@ using System.Windows.Media.Imaging;
 
 [assembly: AssemblyTitle("白龙额度 · Codex 插件")]
 [assembly: AssemblyDescription("由 Codex 启动接入加载的白龙额度插件")]
-[assembly: AssemblyVersion("3.2.0.0")]
-[assembly: AssemblyFileVersion("3.2.0.0")]
+[assembly: AssemblyVersion("3.2.3.0")]
+[assembly: AssemblyFileVersion("3.2.3.0")]
 
 namespace DragonQuota
 {
@@ -79,6 +79,7 @@ namespace DragonQuota
             const int height = 389;
             DateTimeOffset now = DateTimeOffset.Now;
             var surface = new Canvas { Width = width, Height = height, Background = WidgetView.Paint("#F7F4FA") };
+            WidgetFonts.SmoothText(surface);
             var frame = new Border {
                 Width = width - 18, Height = height - 17,
                 BorderBrush = WidgetView.Paint("#E0D8EA"), BorderThickness = new Thickness(1),

@@ -9,12 +9,14 @@ namespace DragonQuota
     internal sealed class IridescentRim
     {
         private readonly RotateTransform _rotation;
+        private readonly TranslateTransform _quotaOffset = new TranslateTransform();
         private readonly double _start;
         private readonly Dictionary<Color, Brush> _accents = new Dictionary<Color, Brush>();
         private bool _animating;
 
         public LinearGradientBrush Brush { get; private set; }
         public Brush Ink { get; private set; }
+        public Brush QuotaInk { get; private set; }
 
         public IridescentRim(bool strong = false)
         {
@@ -50,6 +52,18 @@ namespace DragonQuota
             AddStop(ink, "#4F386D", .81);
             AddStop(ink, "#382A54", 1);
             Ink = ink;
+
+            var quota = new LinearGradientBrush {
+                StartPoint = new Point(0, .5), EndPoint = new Point(1, .5),
+                RelativeTransform = _quotaOffset, SpreadMethod = GradientSpreadMethod.Repeat
+            };
+            AddStop(quota, "#2857C1", 0);
+            AddStop(quota, "#7042C4", .2);
+            AddStop(quota, "#AE2F80", .4);
+            AddStop(quota, "#9F5616", .6);
+            AddStop(quota, "#197C83", .8);
+            AddStop(quota, "#2857C1", 1);
+            QuotaInk = quota;
         }
 
         public Brush Accent(Brush color)
@@ -76,6 +90,7 @@ namespace DragonQuota
             if (!animate)
             {
                 _rotation.BeginAnimation(RotateTransform.AngleProperty, null);
+                _quotaOffset.BeginAnimation(TranslateTransform.XProperty, null);
                 return;
             }
 
@@ -85,6 +100,12 @@ namespace DragonQuota
             };
             Timeline.SetDesiredFrameRate(sweep, 24);
             _rotation.BeginAnimation(RotateTransform.AngleProperty, sweep);
+
+            var quotaSweep = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(3.8)) {
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            Timeline.SetDesiredFrameRate(quotaSweep, 24);
+            _quotaOffset.BeginAnimation(TranslateTransform.XProperty, quotaSweep);
         }
 
         private void Add(string hex, double position)
@@ -111,10 +132,4 @@ namespace DragonQuota
         }
     }
 
-    internal static class WidgetFonts
-    {
-        public static readonly FontFamily Sans = new FontFamily("Anthropic Sans Desktop, Anthropic Sans Web Display Light, Microsoft YaHei UI, Segoe UI");
-        public static readonly FontFamily Serif = new FontFamily("Anthropic Serif Desktop, Anthropic Serif Web Display Light, Microsoft YaHei UI, Georgia");
-        public static readonly FontFamily Mono = new FontFamily("Anthropic Mono Desktop, Anthropic Mono Web, Microsoft YaHei UI, Consolas");
-    }
 }
