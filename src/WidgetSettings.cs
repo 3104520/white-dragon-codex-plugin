@@ -24,6 +24,7 @@ namespace DragonQuota
         public bool ShowStats = true;
         public bool CompletionBubble = true;
         public bool Celebrate = true;
+        public int QuotaRefreshSeconds = 15;
         public string Proxy;
         public string PinnedSession;
         public readonly List<string> Lines = new List<string>();
@@ -56,6 +57,8 @@ namespace DragonQuota
                 settings.ShowStats = ReadBool(map, "showStats");
                 settings.CompletionBubble = ReadBool(map, "completionBubble");
                 settings.Celebrate = ReadBool(map, "celebrate");
+                var interval = CodexUsage.GetInt(map, "quotaRefreshSeconds");
+                if (interval == 10 || interval == 15 || interval == 60) settings.QuotaRefreshSeconds = (int)interval.Value;
                 settings.Proxy = CleanProxy(CodexUsage.GetString(map, "proxy"));
                 var id = CodexUsage.GetString(map, "pinnedSession");
                 if (id != null && id.Length <= 120) settings.PinnedSession = id;
@@ -83,6 +86,7 @@ namespace DragonQuota
             var options = new Dictionary<string, object> {
                 { "corner", Corner.ToString() }, { "mascotSize", MascotSize }, { "bubbleSize", BubbleSize }, { "opacity", Opacity },
                 { "showStats", ShowStats }, { "completionBubble", CompletionBubble }, { "celebrate", Celebrate },
+                { "quotaRefreshSeconds", QuotaRefreshSeconds },
                 { "lines", Lines }, { "customPoses", custom }
             };
             if (Proxy != null) options["proxy"] = Proxy;

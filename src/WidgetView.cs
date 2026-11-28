@@ -276,7 +276,8 @@ namespace DragonQuota
             Bubble.ToolTip = text;
         }
 
-        public void SetLimits(QuotaSample quota, LocalUsage local, bool loading, DateTimeOffset now, TurnSummary completion = null)
+        public void SetLimits(QuotaSample quota, LocalUsage local, bool loading, DateTimeOffset now,
+            TurnSummary completion = null, string status = null)
         {
             RateWindow main = quota == null ? null : quota.Short ?? quota.Long;
             RateWindow weekly = quota == null || main == quota.Long ? null : quota.Long;
@@ -299,11 +300,12 @@ namespace DragonQuota
                 _value.Inlines.Add(new Run(Percent(main.Remaining)));
             }
 
-            Bubble.ToolTip = Details(quota, local, now);
+            Bubble.ToolTip = (String.IsNullOrEmpty(status) ? "" : status + "\n") + Details(quota, local, now);
             if (_compact)
             {
                 _weekly.Text = main == null ? "" : !main.ResetsAt.HasValue ? "重置时间未知" :
                     resetPassed ? "重置后待同步" : "重置 " + LocalTime(main.ResetsAt.Value, now);
+                if (main != null && status != null && status.Contains("缓存")) _weekly.Text += " · 缓存";
                 return;
             }
 
@@ -328,7 +330,7 @@ namespace DragonQuota
             }
             else _context.Text = "";
 
-            string source = quota != null && !quota.FromService ? "额度缓存 " + LocalTime(quota.At, now) : "";
+            string source = status ?? (quota != null && !quota.FromService ? "会话记录 " + LocalTime(quota.At, now) : "");
             if (local != null && local.TotalTokens.HasValue)
             {
                 string tokens = "已用 " + Compact(local.TotalTokens.Value) + " tok";
@@ -394,7 +396,7 @@ namespace DragonQuota
         private static string Details(QuotaSample quota, LocalUsage local, DateTimeOffset now)
         {
             string text = quota == null ? "Codex 额度暂不可用" :
-                (quota.FromService ? "Codex 官方接口 · 更新于 " : "Codex 额度缓存 · 记录于 ") + LocalTime(quota.At, now);
+                (quota.FromService ? "Codex 官方接口 · 查询于 " : "Codex 会话记录 · 记录于 ") + LocalTime(quota.At, now);
             if (quota != null)
             {
                 foreach (var window in new[] { quota.Short, quota.Long })

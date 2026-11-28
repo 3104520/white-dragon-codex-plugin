@@ -27,11 +27,25 @@ namespace DragonQuota
         public bool FromService;
         public QuotaSample[] OtherPools = new QuotaSample[0];
 
-        public QuotaSample AsCache()
+        public QuotaSample WithOtherPools(QuotaSample service)
         {
+            if (service == null) return this;
             var copy = (QuotaSample)MemberwiseClone();
-            copy.FromService = false;
+            copy.OtherPools = service.OtherPools;
+            if (String.Equals(Id, service.Id, StringComparison.OrdinalIgnoreCase)) copy.Plan = Plan ?? service.Plan;
             return copy;
+        }
+
+        public bool SameWindows(QuotaSample sample)
+        {
+            return sample != null && String.Equals(Id, sample.Id, StringComparison.OrdinalIgnoreCase) &&
+                SameWindow(Short, sample.Short) && SameWindow(Long, sample.Long);
+        }
+
+        private static bool SameWindow(RateWindow a, RateWindow b)
+        {
+            return a == null || b == null ? a == b : a.Minutes == b.Minutes &&
+                a.Remaining == b.Remaining && a.ResetsAt == b.ResetsAt;
         }
     }
 
@@ -68,12 +82,15 @@ namespace DragonQuota
                     started = process.Start();
                     if (!started) return null;
                     process.BeginErrorReadLine();
-                    Task timeout = Task.Delay(TimeSpan.FromSeconds(14));
-                    Send(process, "{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"dragon_quota\",\"title\":\"Dragon Quota\",\"version\":\"2.0.0\"}}}");
+                    Task timeout = Task.Delay(TimeSpan.FromSeconds(9));
+                    string version = typeof(CodexUsage).Assembly.GetName().Version.ToString(3);
+                    Send(process, "{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"dragon_quota\",\"title\":\"Dragon Quota\",\"version\":\"" + version + "\"}}}");
                     if (await ReadResult(process, 1, timeout).ConfigureAwait(false) == null) return null;
                     Send(process, "{\"method\":\"initialized\"}");
+                    // A local quota event written during this request may be newer than its response.
+                    var requestedAt = DateTimeOffset.Now;
                     Send(process, "{\"id\":2,\"method\":\"account/rateLimits/read\"}");
-                    return ReadQuotaResult(await ReadResult(process, 2, timeout).ConfigureAwait(false), DateTimeOffset.Now);
+                    return ReadQuotaResult(await ReadResult(process, 2, timeout).ConfigureAwait(false), requestedAt);
                 }
                 catch (System.ComponentModel.Win32Exception) { return null; }
                 catch (IOException) { return null; }
@@ -159,19 +176,25 @@ namespace DragonQuota
 
         private static string FindCodex()
         {
-            foreach (Process app in Process.GetProcessesByName("ChatGPT"))
+            foreach (string executable in new[] { "ChatGPT", "Codex" })
             {
-                using (app)
+                string found = null;
+                foreach (Process app in Process.GetProcessesByName(executable))
                 {
-                    try
+                    using (app)
                     {
-                        string folder = Path.GetDirectoryName(app.MainModule.FileName);
-                        string bundled = Path.Combine(folder, "resources", "codex.exe");
-                        if (File.Exists(bundled)) return bundled;
+                        if (found != null) continue;
+                        try
+                        {
+                            string folder = Path.GetDirectoryName(app.MainModule.FileName);
+                            string bundled = Path.Combine(folder, "resources", "codex.exe");
+                            if (File.Exists(bundled)) found = bundled;
+                        }
+                        catch (System.ComponentModel.Win32Exception) { }
+                        catch (InvalidOperationException) { }
                     }
-                    catch (System.ComponentModel.Win32Exception) { }
-                    catch (InvalidOperationException) { }
                 }
+                if (found != null) return found;
             }
             foreach (string entry in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
             {

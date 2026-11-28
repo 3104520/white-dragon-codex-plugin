@@ -28,11 +28,15 @@ namespace DragonQuota
         private SessionSnapshot _sessions = new SessionSnapshot();
         private LocalUsage _session;
         private QuotaSample _quota;
+        private string _quotaStatus;
+        private string _copyMessage;
+        private DateTimeOffset _copyUntil;
         private bool _loading;
         private DateTimeOffset _at;
         private Border _badge;
         private ComboBox _sessionPicker;
         private Button _refresh;
+        private Button _copy;
         private SettingsView _preferences;
         private StackPanel _contextDetails;
         private string _choices;
@@ -94,6 +98,7 @@ namespace DragonQuota
             _sessionPicker = null;
             _choices = null;
             _refresh = null;
+            _copy = null;
             _preferences = null;
             _contextDetails = null;
             _toolbar.Children.Clear();
@@ -105,6 +110,15 @@ namespace DragonQuota
             AutomationProperties.SetName(close, "关闭面板");
             DockPanel.SetDock(close, Dock.Right);
             _toolbar.Children.Add(close);
+            if (page == PanelPage.Summary)
+            {
+                _copy = PanelTheme.Button("复制", CopyQuota);
+                _copy.ToolTip = "复制额度摘要";
+                AutomationProperties.SetName(_copy, "复制额度摘要");
+                _copy.Margin = new Thickness(0, 0, 5, 0);
+                DockPanel.SetDock(_copy, Dock.Right);
+                _toolbar.Children.Add(_copy);
+            }
             if (page != PanelPage.Summary)
             {
                 var back = PanelTheme.Button("‹ 返回", () => SetPage(PanelPage.Summary));
@@ -154,11 +168,13 @@ namespace DragonQuota
             _layout();
         }
 
-        public void UpdateData(SessionSnapshot sessions, LocalUsage session, QuotaSample quota, bool loading, DateTimeOffset now)
+        public void UpdateData(SessionSnapshot sessions, LocalUsage session, QuotaSample quota, bool loading, DateTimeOffset now,
+            string quotaStatus = null)
         {
             _sessions = sessions;
             _session = session;
             _quota = quota;
+            _quotaStatus = quotaStatus;
             _loading = loading;
             _at = now;
             RenderData();
@@ -176,9 +192,14 @@ namespace DragonQuota
                 _refresh.Content = _loading ? "刷新中…" : "刷新";
                 _refresh.IsEnabled = !_loading;
             }
+            if (_copy != null)
+            {
+                _copy.Content = _at < _copyUntil ? _copyMessage : "复制";
+                _copy.IsEnabled = _quota != null;
+            }
             if (Page == PanelPage.Summary) RenderSummary();
             if (Page == PanelPage.Context) RenderContext();
-            if (_preferences != null) _preferences.UpdateBubblePreview(_quota, _session, _loading, _at);
+            if (_preferences != null) _preferences.UpdateBubblePreview(_quota, _session, _loading, _at, _quotaStatus);
         }
 
         private void RenderSummary()
@@ -314,7 +335,7 @@ namespace DragonQuota
 
         private void AddQuotas(Panel panel)
         {
-            string freshness = _quota == null ? "" : (_quota.FromService ? "更新 " : "缓存 ") + WidgetView.LocalTime(_quota.At, _at);
+            string freshness = _quotaStatus ?? (_quota == null ? "" : (_quota.FromService ? "接口 · " : "会话记录 · ") + QuotaRefresh.Age(_quota.At, _at));
             panel.Children.Add(PanelTheme.Row(PanelTheme.Text("模型剩余额度", 13, bold: true), Muted(freshness)));
             if (_quota == null)
             {
@@ -325,13 +346,42 @@ namespace DragonQuota
             }
             foreach (var pool in new[] { _quota }.Concat(_quota.OtherPools))
             {
+                string detail = String.IsNullOrWhiteSpace(pool.Plan) ? "" : pool.Plan.ToUpperInvariant();
+                if (pool.At != _quota.At) detail = "接口 · " + QuotaRefresh.Age(pool.At, _at);
                 var name = PanelTheme.Row(PanelTheme.Text(pool.Name ?? "Codex", 12, bold: true),
-                    Muted(String.IsNullOrWhiteSpace(pool.Plan) ? "" : pool.Plan.ToUpperInvariant()));
+                    Muted(detail));
                 name.Margin = new Thickness(0, 8, 0, 5);
                 panel.Children.Add(name);
                 AddRate(panel, pool.Short);
                 AddRate(panel, pool.Long);
             }
+        }
+
+        private void CopyQuota()
+        {
+            if (_quota == null) return;
+            var now = DateTimeOffset.Now;
+            var lines = new List<string> { "Codex 额度", _quotaStatus ?? "记录于 " + WidgetView.LocalTime(_quota.At, now) };
+            foreach (var pool in new[] { _quota }.Concat(_quota.OtherPools))
+            {
+                lines.Add((pool.Name ?? "Codex") + " · " + WidgetView.LocalTime(pool.At, now));
+                foreach (var window in new[] { pool.Short, pool.Long })
+                {
+                    if (window == null) continue;
+                    bool expired = window.ResetsAt.HasValue && window.ResetsAt.Value <= now;
+                    var value = expired ? "等待同步" : "剩余 " + WidgetView.Percent(window.Remaining);
+                    lines.Add(WidgetView.WindowName(window) + " · " + value +
+                        (window.ResetsAt.HasValue ? " · 重置 " + window.ResetsAt.Value.LocalDateTime.ToString("MM-dd HH:mm") : ""));
+                }
+            }
+            try
+            {
+                Clipboard.SetText(String.Join(Environment.NewLine, lines));
+                _copyMessage = "已复制";
+            }
+            catch (System.Runtime.InteropServices.ExternalException) { _copyMessage = "重试"; }
+            _copyUntil = now.AddSeconds(3);
+            _copy.Content = _copyMessage;
         }
 
         private void AddRate(Panel panel, RateWindow window)

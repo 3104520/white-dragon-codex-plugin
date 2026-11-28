@@ -32,6 +32,8 @@ namespace DragonQuota
             AddBubbleSize();
             AddSlider("龙娘透明度", 35, 100, settings.Opacity, "%", value => settings.Opacity = value);
             Children.Add(PanelTheme.Rule());
+            AddQuotaRefresh();
+            Children.Add(PanelTheme.Rule());
             AddArt();
             Children.Add(PanelTheme.Rule());
             AddDialogue();
@@ -51,9 +53,28 @@ namespace DragonQuota
                 PanelTheme.Highlight(corner.Value, !_settings.Position.HasValue && corner.Key == _settings.Corner);
         }
 
-        public void UpdateBubblePreview(QuotaSample quota, LocalUsage session, bool loading, DateTimeOffset now)
+        public void UpdateBubblePreview(QuotaSample quota, LocalUsage session, bool loading, DateTimeOffset now, string status)
         {
-            _bubblePreview.SetLimits(quota, session, loading, now);
+            _bubblePreview.SetLimits(quota, session, loading, now, status: status);
+        }
+
+        private void AddQuotaRefresh()
+        {
+            Children.Add(PanelTheme.Text("前台额度查询间隔", 13, bold: true));
+            var row = new UniformGrid { Columns = 3, Margin = new Thickness(0, 6, 0, 10) };
+            var buttons = new Dictionary<int, Button>();
+            foreach (int seconds in new[] { 10, 15, 60 })
+            {
+                var button = PanelTheme.Button(seconds + " 秒", () => {
+                    _settings.QuotaRefreshSeconds = seconds;
+                    foreach (var item in buttons) PanelTheme.Highlight(item.Value, item.Key == seconds);
+                    _apply();
+                });
+                buttons.Add(seconds, button);
+                PanelTheme.Highlight(button, seconds == _settings.QuotaRefreshSeconds);
+                AddCell(row, button);
+            }
+            Children.Add(row);
         }
 
         private void AddSlider(string title, int min, int max, int value, string suffix, Action<int> apply)

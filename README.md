@@ -19,11 +19,14 @@
 - **拖动白龙**可以在 Codex 窗口内自由摆放，松手后保存位置。手动选择角落时会使用该角落的位置。
 - **左键单击**显示短周期和每周额度。再点一次可以切换自定义对白。一次对话完成时自动弹出额度气泡，约 10 秒后收起。空间不足时气泡会改到白龙侧边，或切换为仅显示额度和重置时间的紧凑布局。
 - **右键单击**打开统计面板，可查看上下文长度、累计 Token、缓存命中率及会话明细。
+- **刷新额度**会立即查询，面板和主气泡会显示额度来源和数据时间。面板右上角的「复制」可复制额度摘要和重置时间。
 - **挂件设置**支持调整形象大小、气泡大小和透明度，替换待机、思考、戳一下和庆祝形象，编辑气泡对白，切换统计栏及完成提醒。设置页内的气泡会持续预览当前大小。
 
 <img src="docs/preview.png" alt="统计面板和挂件设置预览，数值为演示数据" width="600">
 
-额度由本机 Codex 的 `account/rateLimits/read` 接口提供，刷新失败时使用可用的本机会话记录。挂件从 Codex 本地会话日志汇总统计，位置和自定义素材保存在 `~/.codex/plugins/data/white-dragon@white-dragon-local/`。设置了 `CODEX_HOME` 的用户使用该目录下相同的相对路径。
+Codex 在前台时，挂件默认每 15 秒通过本机 Codex 的 `account/rateLimits/read` 查询额度。间隔可在设置中选 10、15 或 60 秒。点击气泡、打开面板、对话完成或额度窗口到达重置时间时，会提前查询。会话日志里有更新的额度记录时，挂件会先显示这笔数据。接口暂时失败会延长自动重试间隔，面板仍可手动刷新。
+
+挂件从 Codex 本地会话日志汇总统计，位置和自定义素材保存在 `~/.codex/plugins/data/white-dragon@white-dragon-local/`。设置了 `CODEX_HOME` 的用户使用该目录下相同的相对路径。
 
 ## 更新与卸载
 
@@ -53,5 +56,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\pack.ps1
 ```
 
 `build.ps1` 生成插件 DLL 和启动组件。`pack.ps1` 在 `dist/` 生成可安装的 ZIP 及 SHA-256 校验文件。可使用 `install.ps1 -ValidateOnly` 核对解压后的发行包和本机 Codex 版本。
+
+运行 `tests/run-quota-tests.ps1` 可以复查额度更新顺序、离线重试和会话日志的增量读取。
 
 启动组件复用了 Dragon Codex Boot 的插件加载代码，该部分的 MIT 许可随源码和发行包附带。 [MIT 许可](licenses/DragonCodexBoot-MIT.txt)

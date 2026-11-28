@@ -11,8 +11,8 @@ using System.Windows.Media.Imaging;
 
 [assembly: AssemblyTitle("白龙额度 · Codex 插件")]
 [assembly: AssemblyDescription("由 Codex 启动接入加载的白龙额度插件")]
-[assembly: AssemblyVersion("3.0.3.0")]
-[assembly: AssemblyFileVersion("3.0.3.0")]
+[assembly: AssemblyVersion("3.1.0.0")]
+[assembly: AssemblyFileVersion("3.1.0.0")]
 
 namespace DragonQuota
 {

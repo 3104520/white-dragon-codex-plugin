@@ -265,7 +265,11 @@ namespace DragonQuota
                         var quota = CodexUsage.GetMap(payload, "rate_limits");
                         var id = CodexUsage.GetString(quota, "limit_id");
                         if (id == null || String.Equals(id, "codex", StringComparison.OrdinalIgnoreCase))
-                            _usage.Quota = CodexUsage.ReadQuota(quota, at, false) ?? _usage.Quota;
+                        {
+                            var reading = CodexUsage.ReadQuota(quota, at, false);
+                            if (reading != null && (_usage.Quota == null ||
+                                (at >= _usage.Quota.At && !reading.SameWindows(_usage.Quota)))) _usage.Quota = reading;
+                        }
                         break;
                 }
             }

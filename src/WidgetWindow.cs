@@ -25,6 +25,7 @@ namespace DragonQuota
         private readonly WidgetView _view;
         private readonly StatsWindow _stats;
         private readonly SessionMonitor _monitor = new SessionMonitor();
+        private readonly QuotaRefresh _quota = new QuotaRefresh();
         private readonly Random _random = new Random();
         private readonly DispatcherTimer _timer;
         private readonly DispatcherTimer _pointerTimer;
@@ -47,10 +48,7 @@ namespace DragonQuota
         private bool _closed;
 
         private bool _localBusy;
-        private bool _quotaBusy;
-        private bool _quotaOffline;
         private DateTimeOffset _nextLocal;
-        private DateTimeOffset _nextQuota;
         private DateTimeOffset _nextPaint;
         private DateTimeOffset _lastCompletion = DateTimeOffset.Now;
         private DateTimeOffset _bubbleUntil;
@@ -62,7 +60,6 @@ namespace DragonQuota
         private LocalUsage _completionSession;
         private SessionSnapshot _sessions = new SessionSnapshot();
         private LocalUsage _session;
-        private QuotaSample _live;
 
         public WidgetWindow(WidgetSettings settings)
         {
@@ -113,6 +110,7 @@ namespace DragonQuota
 
         private void Track(object sender, EventArgs args)
         {
+            var previousHost = _host;
             IntPtr foreground = NativeWindows.GetForegroundWindow();
             if (foreground != IntPtr.Zero && foreground != _foreground && !NativeWindows.BelongsTo(foreground, _processId))
             {
@@ -131,7 +129,7 @@ namespace DragonQuota
 
             DateTimeOffset now = DateTimeOffset.Now;
             if (!_localBusy && now >= _nextLocal) RefreshLocal();
-            if (LimitsVisible && !_quotaBusy && now >= _nextQuota) RefreshQuota();
+            RefreshQuota(now, immediate: _host != previousHost);
             UpdateAnimations(now);
             if (LimitsVisible && now >= _nextPaint) PaintData(now);
             LayoutChildren();
@@ -318,7 +316,7 @@ namespace DragonQuota
                     break;
                 case BubbleMode.Limits:
                     IList<string> lines = _settings.Lines.Count > 0 ? (IList<string>)_settings.Lines : Notes;
-                    _view.SetDialogue(ExpandNote(lines[_random.Next(lines.Count)], CurrentQuota(), _session, DateTimeOffset.Now));
+                    _view.SetDialogue(ExpandNote(lines[_random.Next(lines.Count)], _quota.Current, _session, DateTimeOffset.Now));
                     OpenBubble(BubbleMode.Dialogue, DateTimeOffset.Now);
                     break;
                 default:
@@ -348,6 +346,7 @@ namespace DragonQuota
         {
             DateTimeOffset now = DateTimeOffset.Now;
             OpenBubble(BubbleMode.Limits, now);
+            RefreshQuota(now, immediate: true);
             PaintData(now);
         }
 
@@ -394,7 +393,9 @@ namespace DragonQuota
             _panelPlacement = Int32Rect.Empty;
             PlacePanel(true);
             WatchPopup();
-            PaintData(DateTimeOffset.Now);
+            var now = DateTimeOffset.Now;
+            RefreshQuota(now, immediate: true);
+            PaintData(now);
         }
 
         private void ChangeSettings()
@@ -464,9 +465,9 @@ namespace DragonQuota
 
         private void RefreshNow()
         {
-            _nextQuota = _nextLocal = DateTimeOffset.MinValue;
+            _nextLocal = DateTimeOffset.MinValue;
             if (!_localBusy) RefreshLocal();
-            if (!_quotaBusy) RefreshQuota();
+            RefreshQuota(DateTimeOffset.Now, manual: true);
             if (_panel == null || !_panel.IsVisible) ShowLimits();
             else PaintData(DateTimeOffset.Now);
         }
@@ -490,6 +491,7 @@ namespace DragonQuota
             var before = _session;
             _sessions = fresh;
             _session = fresh.Select(_settings.PinnedSession);
+            bool quotaChanged = _quota.Observe(fresh.Quota, now);
             if (_session != before)
             {
                 _stats.UpdateUsage(_session);
@@ -510,12 +512,12 @@ namespace DragonQuota
                         _completion = completed;
                         _completionSession = finishedSession;
                         OpenBubble(BubbleMode.Limits, now);
-                        if (!_quotaBusy && _nextQuota <= now.AddMinutes(1.7)) RefreshQuota();
                     }
+                    RefreshQuota(now, immediate: true);
                 }
             }
             UpdateAnimations(now);
-            if (LimitsVisible && (_session != before || now >= _nextPaint)) PaintData(now);
+            if (LimitsVisible && (quotaChanged || _session != before || now >= _nextPaint)) PaintData(now);
         }
 
         internal void UpdateAnimations(DateTimeOffset now)
@@ -531,33 +533,31 @@ namespace DragonQuota
             else _view.SetPose(_session != null && _session.IsWorking(now) ? DragonPose.Thinking : DragonPose.Idle);
         }
 
-        private async void RefreshQuota()
+        private async void RefreshQuota(DateTimeOffset now, bool immediate = false, bool manual = false)
         {
-            _quotaBusy = true;
-            _nextQuota = DateTimeOffset.Now.AddMinutes(2);
+            if (_closed || !_quota.TryBegin(now, _settings.QuotaRefreshSeconds, immediate, manual)) return;
+            if (LimitsVisible) PaintData(now);
+            QuotaSample sample = null;
             try
             {
-                var sample = await Task.Run(() => CodexUsage.ReadLiveAsync(_settings.Proxy));
-                _quotaOffline = sample == null;
-                if (sample != null) _live = sample;
+                string proxy = _settings.Proxy;
+                sample = await Task.Run(() => CodexUsage.ReadLiveAsync(proxy));
             }
-            finally { _quotaBusy = false; }
-            if (!_closed) PaintData(DateTimeOffset.Now);
-        }
-
-        private QuotaSample CurrentQuota()
-        {
-            if (_live != null && !_quotaOffline) return _live;
-            if (_live != null && (_sessions.Quota == null || _live.At > _sessions.Quota.At)) return _live.AsCache();
-            return _sessions.Quota;
+            finally
+            {
+                now = DateTimeOffset.Now;
+                _quota.Finish(sample, now);
+                if (!_closed && LimitsVisible) PaintData(now);
+            }
         }
 
         private void PaintData(DateTimeOffset now)
         {
             _nextPaint = now.AddSeconds(4);
-            var quota = CurrentQuota();
-            if (_view.Mode == BubbleMode.Limits) _view.SetLimits(quota, _completionSession ?? _session, _quotaBusy, now, _completion);
-            if (_panel != null && _panel.IsVisible) _panel.UpdateData(_sessions, _session, quota, _quotaBusy, now);
+            var quota = _quota.Current;
+            string status = _quota.Status(now, _settings.QuotaRefreshSeconds);
+            if (_view.Mode == BubbleMode.Limits) _view.SetLimits(quota, _completionSession ?? _session, _quota.Pending, now, _completion, status);
+            if (_panel != null && _panel.IsVisible) _panel.UpdateData(_sessions, _session, quota, _quota.Pending, now, status);
         }
 
     }

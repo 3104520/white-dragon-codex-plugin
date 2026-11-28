@@ -1,6 +1,6 @@
 {
   "name": "white-dragon",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "显示本机 Codex 额度和会话统计的白龙娘挂件。",
   "interface": {
     "displayName": "白龙额度",
