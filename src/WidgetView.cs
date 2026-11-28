@@ -18,7 +18,6 @@ namespace DragonQuota
         public const double BubbleHeight = 153;
         public const double CompactBubbleWidth = 176;
         public const double CompactBubbleHeight = 96;
-        private static readonly FontFamily UiFont = new FontFamily("Segoe UI, Microsoft YaHei UI");
         private static readonly Brush Plum = Paint("#50386E");
         private static readonly Brush Ink = Paint("#46335A");
         private static readonly Brush Muted = Paint("#4A3D60");
@@ -39,6 +38,7 @@ namespace DragonQuota
         private readonly Ellipse _smallThought;
         private readonly Path _outline;
         private readonly Path _glaze;
+        private readonly IridescentRim _rim = new IridescentRim(strong: true);
         private readonly ScaleTransform _breath = new ScaleTransform(1, 1);
         private readonly ScaleTransform _squash = new ScaleTransform(1, 1);
         private readonly TranslateTransform _bubbleLift = new TranslateTransform();
@@ -65,10 +65,11 @@ namespace DragonQuota
             _outline = new Path {
                 Data = Geometry.Parse("M 132 5 C 200 3 260 27 272 64 C 287 107 242 139 171 146 C 98 154 35 138 12 108 C -13 76 9 39 50 22 C 74 12 101 6 132 5 Z"),
                 Fill = new LinearGradientBrush(ColorOf("#FFFCFF"), ColorOf("#F7F0FE"), 90),
-                Stroke = Plum, StrokeThickness = 3.8, StrokeLineJoin = PenLineJoin.Round,
+                Stroke = _rim.Brush, StrokeThickness = 3.8, StrokeLineJoin = PenLineJoin.Round,
                 Effect = new DropShadowEffect { Color = ColorOf("#352154"), BlurRadius = 11, ShadowDepth = 3, Direction = 275, Opacity = .21 }
             };
             Bubble.Children.Add(_outline);
+            Bubble.IsVisibleChanged += (sender, args) => _rim.SetVisible(Bubble.IsVisible);
             _glaze = new Path {
                 Data = Geometry.Parse("M 17 67 C 24 49 45 32 70 23 M 77 20 L 82 18.5"),
                 Stroke = Paint("#E7D8F5"), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round,
@@ -82,6 +83,7 @@ namespace DragonQuota
             _context = MakeLabel(Muted, FontWeights.Medium);
             _tokens = MakeLabel(LightInk, FontWeights.Medium);
             _dialogue = MakeLabel(Ink, FontWeights.SemiBold);
+            _dialogue.FontFamily = WidgetFonts.Serif;
             _dialogue.TextWrapping = TextWrapping.Wrap;
             Children.Add(Bubble);
 
@@ -287,7 +289,7 @@ namespace DragonQuota
 
             bool resetPassed = main != null && main.ResetsAt.HasValue && main.ResetsAt.Value <= now;
             _value.Inlines.Clear();
-            _value.Foreground = main == null || resetPassed ? Muted : RemainingColor(main.Remaining);
+            _value.Foreground = _rim.Accent(main == null || resetPassed ? Muted : RemainingColor(main.Remaining));
             if (main == null || resetPassed)
             {
                 _value.Inlines.Add(new Run(loading ? "读取中…" : resetPassed ? "等待同步" : "额度暂不可用") {
@@ -297,7 +299,7 @@ namespace DragonQuota
             else
             {
                 _value.Inlines.Add(new Run("剩余 ") { FontSize = (_compact ? 13 : 17) * _bubbleScale, FontWeight = FontWeights.SemiBold });
-                _value.Inlines.Add(new Run(Percent(main.Remaining)));
+                _value.Inlines.Add(new Run(Percent(main.Remaining)) { FontFamily = WidgetFonts.Mono });
             }
 
             Bubble.ToolTip = (String.IsNullOrEmpty(status) ? "" : status + "\n") + Details(quota, local, now);
@@ -376,8 +378,8 @@ namespace DragonQuota
         private TextBlock MakeLabel(Brush color, FontWeight weight)
         {
             var label = new TextBlock {
-                FontFamily = UiFont, FontWeight = weight, SnapsToDevicePixels = true,
-                Foreground = color, TextAlignment = TextAlignment.Center,
+                FontFamily = WidgetFonts.Sans, FontWeight = weight, SnapsToDevicePixels = true,
+                Foreground = color == Ink ? _rim.Ink : _rim.Accent(color), TextAlignment = TextAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false
             };
             Bubble.Children.Add(label);

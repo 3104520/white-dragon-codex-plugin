@@ -20,6 +20,7 @@ namespace DragonQuota
         private readonly Action _changed;
         private readonly Action _refetch;
         private readonly Action _layout;
+        private readonly IridescentRim _rim = new IridescentRim();
         private readonly DockPanel _layoutRoot = new DockPanel();
         private readonly ScrollViewer _scroller;
         private readonly StackPanel _body = new StackPanel();
@@ -65,11 +66,17 @@ namespace DragonQuota
             AllowsTransparency = true;
             Background = Brushes.Transparent;
             UseLayoutRounding = true;
+            var paper = new LinearGradientBrush(Color.FromArgb(251, 255, 252, 247), Color.FromArgb(248, 248, 243, 254), 115);
+            var liner = new Border {
+                BorderBrush = WidgetView.Paint("#B5E8D4AC"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(13),
+                Margin = new Thickness(1), Padding = new Thickness(12, 9, 12, 10), Child = _layoutRoot
+            };
             var shell = new Border {
-                Background = PanelTheme.Paper, BorderBrush = PanelTheme.Line, BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(16), Padding = new Thickness(15, 12, 15, 13), Child = _layoutRoot
+                Background = paper, BorderBrush = _rim.Brush, BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(16), Child = liner
             };
             Content = shell;
+            IsVisibleChanged += (sender, args) => _rim.SetVisible(IsVisible);
             _toolbar.Margin = new Thickness(0, 0, 0, 12);
             _footer.Margin = new Thickness(0, 12, 0, 0);
             DockPanel.SetDock(_toolbar, Dock.Top);
@@ -136,8 +143,8 @@ namespace DragonQuota
                 _toolbar.Children.Add(avatar);
             }
             var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
-            titleRow.Children.Add(PanelTheme.Text(page == PanelPage.Settings ? "挂件设置" :
-                page == PanelPage.Context ? "上下文观察" : "白龙额度", 17, bold: true));
+            titleRow.Children.Add(Heading(page == PanelPage.Settings ? "挂件设置" :
+                page == PanelPage.Context ? "上下文观察" : "白龙额度", 17));
             _badge = new Border {
                 Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(6, 3, 6, 3),
                 Background = PanelTheme.Tint, CornerRadius = new CornerRadius(8), VerticalAlignment = VerticalAlignment.Center,
@@ -239,7 +246,7 @@ namespace DragonQuota
                     if (!_sessionPicker.IsDropDownOpen) RenderContext();
                 };
                 _sessionPicker.DropDownClosed += (sender, args) => RenderContext();
-                _body.Children.Add(PanelTheme.Text("会话来源", 12, bold: true));
+                _body.Children.Add(Heading("会话来源", 12));
                 _body.Children.Add(_sessionPicker);
                 _contextDetails = new StackPanel();
                 _body.Children.Add(_contextDetails);
@@ -266,7 +273,7 @@ namespace DragonQuota
             AddOptionalUsage("推理 Token · 计入输出", _session.Reasoning);
             AddOptionalUsage("缓存写入 Token", _session.CacheWrite);
             _contextDetails.Children.Add(PanelTheme.Rule());
-            _contextDetails.Children.Add(PanelTheme.Text("最近轮次", 13, bold: true));
+            _contextDetails.Children.Add(Heading("最近轮次"));
             if (_session.RecentTurns.Length == 0) _contextDetails.Children.Add(Muted("尚无已结束的轮次。"));
             foreach (var turn in _session.RecentTurns)
             {
@@ -278,7 +285,7 @@ namespace DragonQuota
             }
             if (_session.TopTools.Length == 0) return;
             _contextDetails.Children.Add(PanelTheme.Rule());
-            _contextDetails.Children.Add(PanelTheme.Text("常用工具", 13, bold: true));
+            _contextDetails.Children.Add(Heading("常用工具"));
             foreach (var tool in _session.TopTools)
             {
                 var row = PanelTheme.Row(Muted(tool.Key), PanelTheme.Text(tool.Value + " 次", 11.5));
@@ -293,7 +300,7 @@ namespace DragonQuota
             string label = usage.HasValue ? PanelTheme.Count(_session.ContextUsed) + " / " + PanelTheme.Count(_session.ContextLimit) +
                 "  ·  " + PanelTheme.Percent(usage) : "等待上下文记录";
             Brush color = usage > 90 ? PanelTheme.Rose : usage > 75 ? PanelTheme.Amber : PanelTheme.Purple;
-            panel.Children.Add(PanelTheme.Row(PanelTheme.Text("上下文长度", 13, bold: true), PanelTheme.Text(label, 11.5, color, true)));
+            panel.Children.Add(PanelTheme.Row(Heading("上下文长度"), PanelTheme.Text(label, 11.5, _rim.Accent(color), true, WidgetFonts.Mono)));
             panel.Children.Add(PanelTheme.Progress(usage, color));
             if (_session != null) panel.Children.Add(Muted("上下文已压缩 " + _session.Compactions + " 次"));
         }
@@ -301,7 +308,7 @@ namespace DragonQuota
         private void AddUsage(Panel panel)
         {
             string summary = _session == null ? "" : _session.Turns + " 轮  ·  " + _session.Tools + " 次工具";
-            panel.Children.Add(PanelTheme.Row(PanelTheme.Text("本会话已用 Token", 13, bold: true), Muted(summary)));
+            panel.Children.Add(PanelTheme.Row(Heading("本会话已用 Token"), Muted(summary)));
             var metrics = new Grid { Margin = new Thickness(0, 8, 0, 7) };
             metrics.ColumnDefinitions.Add(new ColumnDefinition());
             metrics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(7) });
@@ -336,7 +343,7 @@ namespace DragonQuota
         private void AddQuotas(Panel panel)
         {
             string freshness = _quotaStatus ?? (_quota == null ? "" : (_quota.FromService ? "接口 · " : "会话记录 · ") + QuotaRefresh.Age(_quota.At, _at));
-            panel.Children.Add(PanelTheme.Row(PanelTheme.Text("模型剩余额度", 13, bold: true), Muted(freshness)));
+            panel.Children.Add(PanelTheme.Row(Heading("模型剩余额度"), Muted(freshness)));
             if (_quota == null)
             {
                 var unavailable = Muted(_loading ? "正在查询 Codex 额度…" : "暂未取得 Codex 额度");
@@ -348,7 +355,7 @@ namespace DragonQuota
             {
                 string detail = String.IsNullOrWhiteSpace(pool.Plan) ? "" : pool.Plan.ToUpperInvariant();
                 if (pool.At != _quota.At) detail = "接口 · " + QuotaRefresh.Age(pool.At, _at);
-                var name = PanelTheme.Row(PanelTheme.Text(pool.Name ?? "Codex", 12, bold: true),
+                var name = PanelTheme.Row(Heading(pool.Name ?? "Codex", 12),
                     Muted(detail));
                 name.Margin = new Thickness(0, 8, 0, 5);
                 panel.Children.Add(name);
@@ -391,15 +398,16 @@ namespace DragonQuota
             var color = expired ? PanelTheme.Muted : PanelTheme.QuotaColor(window.Remaining);
             string right = expired ? "等待同步" : "剩 " + WidgetView.Percent(window.Remaining);
             if (!expired && window.ResetsAt.HasValue) right += "  ·  " + WidgetView.ResetText(window, _at);
-            panel.Children.Add(PanelTheme.Row(PanelTheme.Text(WidgetView.WindowName(window), 11.5), PanelTheme.Text(right, 11, color, true)));
+            panel.Children.Add(PanelTheme.Row(PanelTheme.Text(WidgetView.WindowName(window), 11.5, _rim.Ink),
+                PanelTheme.Text(right, 11, _rim.Accent(color), true)));
             panel.Children.Add(PanelTheme.Progress(expired ? (double?)null : window.Remaining, color));
         }
 
-        private static Border Metric(string title, string value, Brush color)
+        private Border Metric(string title, string value, Brush color)
         {
             var content = new StackPanel();
             content.Children.Add(Muted(title));
-            content.Children.Add(PanelTheme.Text(value, 17, color, true));
+            content.Children.Add(PanelTheme.Text(value, 17, color == PanelTheme.Ink ? _rim.Ink : _rim.Accent(color), true, WidgetFonts.Mono));
             return new Border {
                 Padding = new Thickness(10, 7, 10, 7), CornerRadius = new CornerRadius(9),
                 Background = PanelTheme.Tint, Child = content
@@ -418,7 +426,8 @@ namespace DragonQuota
             _footer.Children.Add(item);
         }
 
-        private static TextBlock Muted(string text) { return PanelTheme.Text(text, 11.5, PanelTheme.Muted); }
+        private TextBlock Heading(string text, double size = 13) { return PanelTheme.Text(text, size, _rim.Ink, true); }
+        private TextBlock Muted(string text) { return PanelTheme.Text(text, 11.5, _rim.Accent(PanelTheme.Muted)); }
         private static string Rate(double value) { return value.ToString("0.#", CultureInfo.InvariantCulture) + " tok/s"; }
         private static string ShortId(string id) { return id.Length <= 7 ? id : id.Substring(id.Length - 7); }
 

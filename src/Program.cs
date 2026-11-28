@@ -11,8 +11,8 @@ using System.Windows.Media.Imaging;
 
 [assembly: AssemblyTitle("白龙额度 · Codex 插件")]
 [assembly: AssemblyDescription("由 Codex 启动接入加载的白龙额度插件")]
-[assembly: AssemblyVersion("3.1.0.0")]
-[assembly: AssemblyFileVersion("3.1.0.0")]
+[assembly: AssemblyVersion("3.2.0.0")]
+[assembly: AssemblyFileVersion("3.2.0.0")]
 
 namespace DragonQuota
 {
@@ -89,7 +89,7 @@ namespace DragonQuota
             Canvas.SetTop(frame, 8);
             surface.Children.Add(frame);
             var demo = new TextBlock {
-                Text = "效果预览", FontSize = 11, FontFamily = new FontFamily("Microsoft YaHei UI"),
+                Text = "效果预览", FontSize = 11, FontFamily = WidgetFonts.Sans,
                 Foreground = WidgetView.Paint("#726481")
             };
             Canvas.SetLeft(demo, 24);

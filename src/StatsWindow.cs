@@ -28,7 +28,7 @@ namespace DragonQuota
             _text.TextAlignment = TextAlignment.Center;
             Content = new Border {
                 CornerRadius = new CornerRadius(11), Background = WidgetView.Paint("#F7F1FC"),
-                BorderBrush = PanelTheme.Line, BorderThickness = new Thickness(1),
+                BorderBrush = new IridescentRim().Brush, BorderThickness = new Thickness(1),
                 Padding = new Thickness(8, 2, 8, 2), Child = _text
             };
             _handle = new WindowInteropHelper(this).EnsureHandle();

@@ -8,7 +8,7 @@ namespace DragonQuota
 {
     internal static class PanelTheme
     {
-        public static readonly FontFamily Font = new FontFamily("Segoe UI, Microsoft YaHei UI");
+        public static readonly FontFamily Font = WidgetFonts.Sans;
         public static readonly Brush Ink = WidgetView.Paint("#2F2442");
         public static readonly Brush Muted = WidgetView.Paint("#695D7B");
         public static readonly Brush Purple = WidgetView.Paint("#6947AC");
@@ -71,10 +71,10 @@ namespace DragonQuota
                 </Setter>
             </Style>");
 
-        public static TextBlock Text(string value, double size = 12, Brush color = null, bool bold = false)
+        public static TextBlock Text(string value, double size = 12, Brush color = null, bool bold = false, FontFamily font = null)
         {
             return new TextBlock {
-                Text = value, FontFamily = Font, FontSize = size, Foreground = color ?? Ink,
+                Text = value, FontFamily = font ?? Font, FontSize = size, Foreground = color ?? Ink,
                 FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center
             };
